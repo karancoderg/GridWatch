@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+from models.enums import Severity
 @dataclass
 class SubStation:
     id: str

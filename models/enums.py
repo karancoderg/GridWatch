@@ -1,3 +1,4 @@
+from enum import Enum
 class Severity(Enum):
     GREEN = 0
     YELLOW = 1

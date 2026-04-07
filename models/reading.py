@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+from datetime import datetime
+from models.enums import Severity
 @dataclass
 class TelemetryReading:
     id: str
