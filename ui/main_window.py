@@ -1,14 +1,16 @@
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QSplitter
 from PyQt6.QtCore import Qt, QTimer
 
-# Import the custom UI widgets
 from ui.sidebar import StationSidebar
 from ui.charts_panel import ChartsPanel
 from ui.alert_panel import AlertPanel
+from data.store import GridWatchStore
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, store: GridWatchStore):
         super().__init__()
+        
+        self.store = store
         
         # Enhance window structure and naming
         self.setWindowTitle("GridWatch • Mission Control")
@@ -45,10 +47,13 @@ class MainWindow(QMainWindow):
         """)
         # ──────────────────────────────────────────────────────────────────────
 
-        # Initialize UI Components (assuming they are defined in your scope)
+        # Initialize UI Components
         self.sidebar = StationSidebar(self)
         self.charts  = ChartsPanel(self)
         self.alerts  = AlertPanel(self)
+        
+        # Connect clicking functionality securely
+        self.sidebar.station_selected.connect(self._on_station_selected)
         
         # Structure the Right Area as a unified "Card" giving elements breathing room
         right_panel = QWidget()
@@ -67,20 +72,34 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self.sidebar)
         splitter.addWidget(right_panel)
         
-        # Adjusted for modern widescreen ratios (e.g. 300px sidebar, remainder is charts)
         splitter.setSizes([300, 980])
-        splitter.setChildrenCollapsible(False) # Prevent users from accidentally hiding a panel!
+        splitter.setChildrenCollapsible(False) # Prevent users from accidentally hiding a panel
         
         self.setCentralWidget(splitter)
         
-        # 2-second UI refresh polling
+        # Boot initial sync instantly
+        self.sidebar.refresh_stations(self.store)
+        
+        # Start the Background Display Poller
         self.timer = QTimer()
         self.timer.timeout.connect(self.refresh)
         self.timer.start(2000)
         
+    def _on_station_selected(self, station_id: str):
+        """React physically when a user clicks the sidebar list!"""
+        self.charts.refresh_charts(station_id, self.store)
+        self.alerts.refresh_alerts(station_id, self.store)
+        
     def refresh(self):
         """
-        Master refresh loop to fetch the newest SQLite telemetry
-        and push it to the Charts and Alert panels.
+        Master refresh loop to SAFELY trigger UI Cascading renders now that
+        DataGenerator handles all SQLite insertions autonomously via background thread.
         """
-        pass
+        # 1. Trigger UI Cascading renders
+        self.sidebar.refresh_stations(self.store)
+        
+        # 2. Only update the deeply-focused Right panels if a station is currently targeted
+        active_station = self.sidebar.current_station_id
+        if active_station:
+            self.charts.refresh_charts(active_station, self.store)
+            self.alerts.refresh_alerts(active_station, self.store)
