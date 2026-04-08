@@ -1,4 +1,6 @@
 import random
+import time
+import threading
 from uuid import uuid4
 from datetime import datetime
 from models.sensor import Sensor
@@ -95,3 +97,54 @@ def generate_reading(sensor: Sensor, reading_index: int) -> TelemetryReading:
         value=round(value, 2),
         timestamp=datetime.now(),
     )
+
+
+class DataGenerator(threading.Thread):
+    """
+    Dedicated Background Polling Thread.
+    Autonomously pumps generated data straight through the Python mathematics engine!
+    """
+    def __init__(self, store, engine):
+        super().__init__(daemon=True) # Exits aggressively when Python exits
+        self.store = store
+        self.engine = engine
+        self._running = False
+        self.cycle_count = 0
+        
+    def start(self):
+        self._running = True
+        super().start()
+        
+    def stop(self):
+        self._running = False
+        
+    def run(self):
+        # 1. Discover all dynamic sensors straight from the Store
+        with self.store.get_connection() as conn:
+            sensors_data = conn.execute("SELECT * FROM sensors").fetchall()
+            
+        sensors = []
+        for s_row in sensors_data:
+            sensors.append(Sensor(
+                id=s_row['id'],
+                station_id=s_row['station_id'],
+                type=SensorType(s_row['type']),
+                unit=s_row['unit']
+            ))
+            
+        # 2. Trigger infinite hardware pulse!
+        while self._running:
+            self.cycle_count += 1
+            readings_batch = []
+            
+            for sens in sensors:
+                # Mathematically spool raw numbers
+                raw_reading = generate_reading(sens, self.cycle_count)
+                # Ensure the engine filters them for limit logic overriding thresholds 
+                processed = self.engine.process_reading(raw_reading, sens, self.store)
+                readings_batch.append(processed)
+                
+            if readings_batch:
+                self.store.save_readings_batch(readings_batch)
+                
+            time.sleep(2.0) # Sleep securely out-of-band simulating a 2s physical hardware burst
