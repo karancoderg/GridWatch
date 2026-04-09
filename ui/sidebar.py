@@ -81,13 +81,29 @@ class StationSidebar(QWidget):
         with store.get_connection() as conn:
             stations = conn.execute("SELECT id, name FROM stations ORDER BY name").fetchall()
             
-        for idx, st in enumerate(stations):
+        station_data = []
+        for st in stations:
             st_id = st['id']
-            st_name = st['name']
-            
             # The backend engines built earlier do all the heavy lifting!
             sev = compute_station_color(st_id, store)
             alerts = get_alert_count(st_id, store)
+            station_data.append({
+                'id': st_id,
+                'name': st['name'],
+                'severity': sev,
+                'alerts': alerts
+            })
+            
+        # Aggressively dynamically sort the data stream directly on every pulse!
+        # Priority 1: Highest Severity
+        # Priority 2: Highest Alert Count within that Severity layer
+        station_data.sort(key=lambda s: (-s['severity'].value, -s['alerts']))
+            
+        for idx, st in enumerate(station_data):
+            st_id = st['id']
+            st_name = st['name']
+            sev = st['severity']
+            alerts = st['alerts']
             
             alert_text = f" ({alerts} ↑)" if alerts > 0 else ""
             
