@@ -78,8 +78,8 @@ def generate_reading(sensor: Sensor, reading_index: int) -> TelemetryReading:
     base  = BASELINES[sensor.type]
     noise = random.gauss(0, NOISE_STD[sensor.type])
 
-    # priority 1 — spike (every 30 readings)
-    if reading_index % 30 == 0:
+    # priority 1 — sudden critical spike (every 100 readings to allow recovery phases!)
+    if reading_index % 100 == 0:
         value = inject_spike(sensor.type)
 
     # priority 2 — sustained drift (every 50 readings, lasts 10 steps)
@@ -110,6 +110,7 @@ class DataGenerator(threading.Thread):
         self.engine = engine
         self._running = False
         self.cycle_count = 0
+        self.station_offsets = {}
         
     def start(self):
         self._running = True
@@ -122,6 +123,12 @@ class DataGenerator(threading.Thread):
         # 1. Discover all dynamic sensors straight from the Store
         with self.store.get_connection() as conn:
             sensors_data = conn.execute("SELECT * FROM sensors").fetchall()
+            
+        # Dynamically assign evenly spaced cycle offsets for each station
+        # so spikes and drifts do not occur at the exact same moment across the grid.
+        unique_stations = list(set([s['station_id'] for s in sensors_data]))
+        for i, s_id in enumerate(unique_stations):
+            self.station_offsets[s_id] = int((i / len(unique_stations)) * 100)
             
         sensors = []
         for s_row in sensors_data:
@@ -138,8 +145,11 @@ class DataGenerator(threading.Thread):
             readings_batch = []
             
             for sens in sensors:
+                # Get the offset for this sensor's station to desynchronize anomalies!
+                offset = self.station_offsets.get(sens.station_id, 0)
+                
                 # Mathematically spool raw numbers
-                raw_reading = generate_reading(sens, self.cycle_count)
+                raw_reading = generate_reading(sens, self.cycle_count + offset)
                 # Ensure the engine filters them for limit logic overriding thresholds 
                 processed = self.engine.process_reading(raw_reading, sens, self.store)
                 readings_batch.append(processed)

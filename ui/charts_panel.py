@@ -70,11 +70,7 @@ class ChartsPanel(QWidget):
             
         # Reverse list natively inside python for Chart direction (left->right time flow)
         for row in reversed(rows):
-            try:
-                # Handle raw microsecond isolation from SQLite
-                dt = datetime.strptime(row['timestamp'], "%Y-%m-%d %H:%M:%S.%f")
-            except ValueError:
-                dt = datetime.strptime(row['timestamp'], "%Y-%m-%d %H:%M:%S")
+            dt = datetime.fromisoformat(row['timestamp'])
                 
             r = TelemetryReading(
                 id=row['id'],
@@ -112,5 +108,5 @@ class ChartsPanel(QWidget):
             
         # Update specific title details cleanly
         latest_val = values[-1]
-        ax.set_title(f"{sensor_type.value.capitalize()} • Active: {latest_val} {unit}", color='#E2E8F0', fontsize=11, fontname="Inter")
+        ax.set_title(f"{sensor_type.value.capitalize()} • Active: {latest_val} {unit}", color='#E2E8F0', fontsize=11)
         ax.set_ylabel(unit, color='#94A3B8')
