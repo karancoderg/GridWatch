@@ -1,5 +1,6 @@
 ## Video Walkthrough
-[VIDEO_LINK_HERE]
+
+**▶️ [Watch the Technical Walkthrough Video](https://youtu.be/Bb7yqa34UkM)**
 
 ---
 
